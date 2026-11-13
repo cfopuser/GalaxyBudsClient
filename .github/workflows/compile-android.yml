@@ -10,8 +10,24 @@ permissions:
 
 jobs:
   build:
+    name: Build ${{ matrix.abi }} APK
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - abi: arm64-v8a
+            runtime: android-arm64
+          - abi: armeabi-v7a
+            runtime: android-arm
+          - abi: x86_64
+            runtime: android-x64
+          - abi: x86
+            runtime: android-x86
+    env:
+      APK_ABI: ${{ matrix.abi }}
+      ANDROID_RUNTIME: ${{ matrix.runtime }}
 
     steps:
       - uses: actions/checkout@v6
@@ -48,6 +64,7 @@ jobs:
             -p:AndroidSdkDirectory="$ANDROID_HOME" \
             -p:JavaSdkDirectory="$JAVA_HOME" \
             -p:AndroidPackageFormats=apk \
+            -p:RuntimeIdentifiers="$ANDROID_RUNTIME" \
             -p:IsAndroid=true -p:NoDemo=true \
             -p:NotDebuggable=true -p:DebugType=PdbOnly -p:EmbedAssembliesIntoApk=true \
             -p:AndroidKeyStore=true -p:AndroidSigningKeyStore="$keystore" \
@@ -63,15 +80,18 @@ jobs:
           badging="$("$tools/aapt" dump badging "$apk")"
           [[ "$badging" == *"package: name='me.timschneeberger.galaxybudsclient'"* ]]
           [[ "$badging" != *"application-debuggable"* ]]
+          grep -Fx "native-code: '$APK_ABI'" <<< "$badging"
 
           mkdir artifacts
-          cp "$apk" artifacts/GalaxyBudsClient-Android.apk
+          filename="GalaxyBudsClient-Android-$APK_ABI.apk"
+          cp "$apk" "artifacts/$filename"
           cp LICENSE artifacts/
           cd artifacts
-          sha256sum GalaxyBudsClient-Android.apk > GalaxyBudsClient-Android.apk.sha256
+          sha256sum "$filename" > "$filename.sha256"
+          stat -c '%n %s bytes' "$filename"
 
       - uses: actions/upload-artifact@v6
         with:
-          name: GalaxyBudsClient-Android
+          name: GalaxyBudsClient-Android-${{ matrix.abi }}
           path: artifacts/
           if-no-files-found: error
