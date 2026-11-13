@@ -64,16 +64,7 @@ Download the desktop version here:
     <a href="https://github.com/timschneeb/GalaxyBudsClient/releases"><img alt="Download" src="https://github.com/timschneeb/GalaxyBudsClient/raw/master/screenshots/download.png"></a>
 </p>
 
-### Android
-
-Download the free, full-featured APK from the latest successful
-[Build Android APK run](https://github.com/cfopuser/GalaxyBudsClient/actions/workflows/compile-android.yml).
-Sign in to GitHub to download the **GalaxyBudsClient-Android** artifact, extract
-it, and open `GalaxyBudsClient-Android.apk` on your Android device. The fork
-uses its own package ID and signing key, so it can be installed alongside the
-Google Play version and updated with later APKs from this workflow.
-
-The upstream Google Play edition is also available:
+Download the Android mobile version here (paid):
 <p align="center">
   <a href='https://play.google.com/store/apps/details?id=me.timschneeberger.galaxybudsclient&utm_source=github&pcampaignid=pcampaignidMKT-Other-global-all-co-prtnr-py-PartBadge-Mar2515-1'>
     <img width="300" alt='Get it on Google Play' src='https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png'/>

@@ -48,7 +48,7 @@ jobs:
             -p:AndroidSdkDirectory="$ANDROID_HOME" \
             -p:JavaSdkDirectory="$JAVA_HOME" \
             -p:AndroidPackageFormats=apk \
-            -p:IsAndroid=true -p:SideloadBuild=true \
+            -p:IsAndroid=true -p:NoDemo=true \
             -p:NotDebuggable=true -p:DebugType=PdbOnly -p:EmbedAssembliesIntoApk=true \
             -p:AndroidKeyStore=true -p:AndroidSigningKeyStore="$keystore" \
             -p:AndroidSigningKeyAlias=galaxybudsclient \
@@ -57,11 +57,11 @@ jobs:
 
       - name: Verify and prepare APK
         run: |
-          apk="$RUNNER_TEMP/android-publish/io.github.cfopuser.galaxybudsclient-Signed.apk"
+          apk="$RUNNER_TEMP/android-publish/me.timschneeberger.galaxybudsclient-Signed.apk"
           tools="$ANDROID_HOME/build-tools/36.1.0"
           "$tools/apksigner" verify --print-certs "$apk"
           badging="$("$tools/aapt" dump badging "$apk")"
-          [[ "$badging" == *"package: name='io.github.cfopuser.galaxybudsclient'"* ]]
+          [[ "$badging" == *"package: name='me.timschneeberger.galaxybudsclient'"* ]]
           [[ "$badging" != *"application-debuggable"* ]]
 
           mkdir artifacts
