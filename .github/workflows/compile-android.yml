@@ -1,0 +1,77 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-java@v5
+        with:
+          distribution: microsoft
+          java-version: '21'
+
+      - name: Install .NET Android workload
+        run: dotnet workload install android --skip-manifest-update
+
+      - name: Build and sign APK
+        env:
+          ANDROID_SIGNING_KEYSTORE: ${{ secrets.ANDROID_SIGNING_KEYSTORE }}
+          ANDROID_SIGNING_PASSWORD: ${{ secrets.ANDROID_SIGNING_PASSWORD }}
+        run: |
+          : "${ANDROID_SIGNING_KEYSTORE:?Set the ANDROID_SIGNING_KEYSTORE repository secret}"
+          : "${ANDROID_SIGNING_PASSWORD:?Set the ANDROID_SIGNING_PASSWORD repository secret}"
+          umask 077
+          keystore="$(mktemp "$RUNNER_TEMP/galaxybuds-signing.XXXXXX.p12")"
+          trap 'rm -f -- "$keystore"' EXIT
+          printf '%s' "$ANDROID_SIGNING_KEYSTORE" | base64 --decode > "$keystore"
+          unset ANDROID_SIGNING_KEYSTORE
+
+          # Match the upstream Android build configuration with embedded assemblies.
+          dotnet publish GalaxyBudsClient.Android/GalaxyBudsClient.Android.csproj \
+            --framework net10.0-android36.1 --configuration Debug \
+            --output "$RUNNER_TEMP/android-publish" \
+            -p:AndroidSdkDirectory="$ANDROID_HOME" \
+            -p:JavaSdkDirectory="$JAVA_HOME" \
+            -p:AndroidPackageFormats=apk \
+            -p:IsAndroid=true -p:SideloadBuild=true \
+            -p:NotDebuggable=true -p:DebugType=PdbOnly -p:EmbedAssembliesIntoApk=true \
+            -p:AndroidKeyStore=true -p:AndroidSigningKeyStore="$keystore" \
+            -p:AndroidSigningKeyAlias=galaxybudsclient \
+            -p:AndroidSigningKeyPass=env:ANDROID_SIGNING_PASSWORD \
+            -p:AndroidSigningStorePass=env:ANDROID_SIGNING_PASSWORD
+
+      - name: Verify and prepare APK
+        run: |
+          apk="$RUNNER_TEMP/android-publish/io.github.cfopuser.galaxybudsclient-Signed.apk"
+          tools="$ANDROID_HOME/build-tools/36.1.0"
+          "$tools/apksigner" verify --print-certs "$apk"
+          badging="$("$tools/aapt" dump badging "$apk")"
+          [[ "$badging" == *"package: name='io.github.cfopuser.galaxybudsclient'"* ]]
+          [[ "$badging" != *"application-debuggable"* ]]
+
+          mkdir artifacts
+          cp "$apk" artifacts/GalaxyBudsClient-Android.apk
+          cp LICENSE artifacts/
+          cd artifacts
+          sha256sum GalaxyBudsClient-Android.apk > GalaxyBudsClient-Android.apk.sha256
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: GalaxyBudsClient-Android
+          path: artifacts/
+          if-no-files-found: error

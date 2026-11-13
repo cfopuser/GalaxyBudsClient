@@ -19,27 +19,31 @@
     <DefineConstants Condition="'$(NotDebuggable)' == true">$(DefineConstants);NotDebuggable</DefineConstants>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(NoDemo)' == true">
+  <PropertyGroup Condition="'$(NoDemo)' == true And '$(SideloadBuild)' != true">
     <ApplicationId>me.timschneeberger.galaxybudsclient</ApplicationId>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(NoDemo)' == false Or '$(NoDemo)' == ''">
+  <PropertyGroup Condition="'$(NoDemo)' != true And '$(SideloadBuild)' != true">
     <ApplicationId>me.timschneeberger.galaxybudsclient.demo</ApplicationId>
   </PropertyGroup>
+
+  <PropertyGroup Condition="'$(SideloadBuild)' == true">
+    <ApplicationId>io.github.cfopuser.galaxybudsclient</ApplicationId>
+  </PropertyGroup>
   
-  <ItemGroup Condition="'$(NoDemo)' == true">
+  <ItemGroup Condition="'$(NoDemo)' == true Or '$(SideloadBuild)' == true">
     <AndroidResource Include="Icons/full/**">
       <Link>Resources/%(RecursiveDir)%(Filename)%(Extension)</Link>
     </AndroidResource>
   </ItemGroup>
   
-  <ItemGroup Condition="'$(NoDemo)' == false Or '$(NoDemo)' == ''">
+  <ItemGroup Condition="'$(NoDemo)' != true And '$(SideloadBuild)' != true">
     <AndroidResource Include="Icons/demo/**">
       <Link>Resources/%(RecursiveDir)%(Filename)%(Extension)</Link>
     </AndroidResource>
   </ItemGroup>
   
-  <PropertyGroup Condition="'$(NoDemo)' == true">
+  <PropertyGroup Condition="'$(NoDemo)' == true And '$(SideloadBuild)' != true">
     <DefineConstants>$(DefineConstants);RequestFullVersion</DefineConstants>
   </PropertyGroup>
           
