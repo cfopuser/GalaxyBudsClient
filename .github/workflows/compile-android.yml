@@ -10,8 +10,24 @@ permissions:
 
 jobs:
   build:
+    name: Build ${{ matrix.abi }} APK
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - abi: arm64-v8a
+            runtime: android-arm64
+          - abi: armeabi-v7a
+            runtime: android-arm
+          - abi: x86_64
+            runtime: android-x64
+          - abi: x86
+            runtime: android-x86
+    env:
+      APK_ABI: ${{ matrix.abi }}
+      APK_RUNTIME: ${{ matrix.runtime }}
 
     steps:
       - uses: actions/checkout@v6
@@ -41,6 +57,16 @@ jobs:
           printf '%s' "$ANDROID_SIGNING_KEYSTORE" | base64 --decode > "$keystore"
           unset ANDROID_SIGNING_KEYSTORE
 
+          # Set the runtime on the Android app only so shared libraries keep their normal targets.
+          targets="$RUNNER_TEMP/AndroidPackage.targets"
+          cat > "$targets" <<'EOF'
+          <Project>
+            <PropertyGroup Condition="'$(MSBuildProjectName)' == 'GalaxyBudsClient.Android'">
+              <RuntimeIdentifiers>$(ApkRuntime)</RuntimeIdentifiers>
+            </PropertyGroup>
+          </Project>
+          EOF
+
           # Match the upstream Android build configuration with embedded assemblies.
           dotnet publish GalaxyBudsClient.Android/GalaxyBudsClient.Android.csproj \
             --framework net10.0-android36.1 --configuration Debug \
@@ -48,7 +74,7 @@ jobs:
             -p:AndroidSdkDirectory="$ANDROID_HOME" \
             -p:JavaSdkDirectory="$JAVA_HOME" \
             -p:AndroidPackageFormats=apk \
-            -p:AndroidCreatePackagePerAbi=true '-p:AndroidVersionCodePattern={versionCode}' \
+            -p:DirectoryBuildTargetsPath="$targets" -p:ApkRuntime="$APK_RUNTIME" \
             -p:IsAndroid=true -p:NoDemo=true \
             -p:NotDebuggable=true -p:DebugType=PdbOnly -p:EmbedAssembliesIntoApk=true \
             -p:AndroidKeyStore=true -p:AndroidSigningKeyStore="$keystore" \
@@ -58,46 +84,24 @@ jobs:
 
       - name: Verify and prepare APK
         run: |
+          apk="$RUNNER_TEMP/android-publish/me.timschneeberger.galaxybudsclient-Signed.apk"
           tools="$ANDROID_HOME/build-tools/36.1.0"
-          package=me.timschneeberger.galaxybudsclient
-          publish="$RUNNER_TEMP/android-publish"
-          for abi in arm64-v8a armeabi-v7a x86_64 x86; do
-            apk="$publish/$package-$abi-Signed.apk"
-            "$tools/apksigner" verify --print-certs "$apk"
-            badging="$("$tools/aapt" dump badging "$apk")"
-            [[ "$badging" == *"package: name='$package'"* ]]
-            [[ "$badging" != *"application-debuggable"* ]]
-            grep -Fx "native-code: '$abi'" <<< "$badging"
+          "$tools/apksigner" verify --print-certs "$apk"
+          badging="$("$tools/aapt" dump badging "$apk")"
+          [[ "$badging" == *"package: name='me.timschneeberger.galaxybudsclient'"* ]]
+          [[ "$badging" != *"application-debuggable"* ]]
+          grep -Fx "native-code: '$APK_ABI'" <<< "$badging"
 
-            directory="artifacts/$abi"
-            filename="GalaxyBudsClient-Android-$abi.apk"
-            mkdir -p "$directory"
-            cp "$apk" "$directory/$filename"
-            cp LICENSE "$directory/"
-            (
-              cd "$directory"
-              sha256sum "$filename" > "$filename.sha256"
-              stat -c '%n %s bytes' "$filename"
-            )
-          done
+          mkdir artifacts
+          filename="GalaxyBudsClient-Android-$APK_ABI.apk"
+          cp "$apk" "artifacts/$filename"
+          cp LICENSE artifacts/
+          cd artifacts
+          sha256sum "$filename" > "$filename.sha256"
+          stat -c '%n %s bytes' "$filename"
 
       - uses: actions/upload-artifact@v6
         with:
-          name: GalaxyBudsClient-Android-arm64-v8a
-          path: artifacts/arm64-v8a/
-          if-no-files-found: error
-      - uses: actions/upload-artifact@v6
-        with:
-          name: GalaxyBudsClient-Android-armeabi-v7a
-          path: artifacts/armeabi-v7a/
-          if-no-files-found: error
-      - uses: actions/upload-artifact@v6
-        with:
-          name: GalaxyBudsClient-Android-x86_64
-          path: artifacts/x86_64/
-          if-no-files-found: error
-      - uses: actions/upload-artifact@v6
-        with:
-          name: GalaxyBudsClient-Android-x86
-          path: artifacts/x86/
+          name: GalaxyBudsClient-Android-${{ matrix.abi }}
+          path: artifacts/
           if-no-files-found: error
